@@ -756,7 +756,7 @@ def evaluate(
     return reduced_metrics
 
 
-def save_code_and_config(config: PretrainConfig, save_dir: str):
+def save_code_and_config(config: PretrainConfig, save_dir: str ="./output"):
     import os, json
     import yaml
 
