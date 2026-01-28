@@ -5,7 +5,7 @@ tqdm
 coolname
 pydantic
 argdantic
-wandb
+comet_ml
 omegaconf
 hydra-core
 huggingface_hub

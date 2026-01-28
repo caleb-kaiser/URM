@@ -1,3 +1,4 @@
+import comet_ml
 from typing import Optional, Any, Sequence, List, Tuple
 from dataclasses import dataclass
 import os
@@ -14,7 +15,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 import tqdm
-import wandb
+from comet_ml import Experiment
 import coolname
 import hydra
 import pydantic
@@ -147,6 +148,9 @@ class TrainState:
     step: int
     total_steps: int
     accum_step: int = 0
+
+
+experiment: Optional[Experiment] = None
 
 
 def create_dataloader(config: PretrainConfig, split: str, rank: int, world_size: int, **kwargs):
@@ -893,13 +897,13 @@ def launch(hydra_config: DictConfig):
         if train_state.step > 0:
             progress_bar.update(train_state.step)
 
-        wandb.init(
-            project=config.project_name,
-            name=config.run_name,
-            config=config.model_dump(),
-            settings=wandb.Settings(_disable_stats=True),
+        global experiment
+        experiment = Experiment(
+            project_name=config.project_name,
+            experiment_name=config.run_name,
         )
-        wandb.log({"num_params": sum(x.numel() for x in train_state.model.parameters())}, step=0)
+        experiment.log_parameters(config.model_dump())
+        experiment.log_metric("num_params", sum(x.numel() for x in train_state.model.parameters()), step=0)
         save_code_and_config(config)
 
     # Training Loop
@@ -927,7 +931,7 @@ def launch(hydra_config: DictConfig):
                 ema_helper.update(train_state.model)
 
             if RANK == 0 and metrics is not None:
-                wandb.log(metrics, step=train_state.step)
+                experiment.log_metrics(metrics, step=train_state.step)
                 progress_bar.update(train_state.step - progress_bar.n)
 
         ############ Evaluation
@@ -962,7 +966,7 @@ def launch(hydra_config: DictConfig):
                     cpu_group=CPU_PROCESS_GROUP,
                 )
                 if RANK == 0 and metrics is not None:
-                    wandb.log(metrics, step=train_state.step)
+                    experiment.log_metrics(metrics, step=train_state.step)
 
             if loop_config is not None:
                 loop_config.loops = original_loops
@@ -985,7 +989,8 @@ def launch(hydra_config: DictConfig):
     # finalize
     if dist.is_initialized():
         dist.destroy_process_group()
-    wandb.finish()
+    if experiment is not None:
+        experiment.end()
 
 
 if __name__ == "__main__":
