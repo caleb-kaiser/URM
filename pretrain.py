@@ -904,7 +904,6 @@ def launch(hydra_config: DictConfig):
         )
         experiment.log_parameters(config.model_dump())
         experiment.log_metric("num_params", sum(x.numel() for x in train_state.model.parameters()), step=0)
-        save_code_and_config(config)
 
     # Training Loop
     for _iter_id in range(total_iters):
